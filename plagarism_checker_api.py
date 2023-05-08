@@ -5,6 +5,8 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from fastapi import FastAPI
 from db_config import db_config
+import os
+from fastapi.middleware.cors import CORSMiddleware
 
 mydb = mysql.connector.connect(
     host=db_config["host"],
@@ -16,8 +18,21 @@ mydb = mysql.connector.connect(
 
 app = FastAPI()
 
-@app.get("/cosine_similarity_matrices/{lesson_content_id}")
-async def get_cosine_similarity_matrices(lesson_content_id: int):
+origins = [
+    "http://localhost",
+    "http://localhost:8085",
+    "http://localhost:3000",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+@app.get("/plagiarism_matrices/{lesson_content_id}")
+async def get_plagiarism_matrices(lesson_content_id: int):
 
     # Create a cursor object
     mycursor = mydb.cursor()
@@ -78,13 +93,16 @@ async def get_cosine_similarity_matrices(lesson_content_id: int):
             df.loc[i] = row
         
         # Save the DataFrame to a CSV file in the same folder
-        df.to_csv(f"{lesson_content_id}_lesson_plagiarism.csv", index=False)
+        csv_path = os.path.join(os.getcwd(), f"{lesson_content_id}_lesson_plagiarism.csv")
+        df.to_csv(csv_path, index=False)
 
         # Clean up
         mycursor.close()
 
-        # Convert DataFrame to JSON and return it
-        return df.to_json()
+        # Convert DataFrame to JSON and return it along with the CSV path
+        #response = {"json_data": df.to_json(), "Replace '/workspace/ML_practice/' with 'https://github.com/kavithamangalagiri/ML_practice/blob/master/'\ncsv_path": csv_path.replace("\\\\", "\\")}
+        response = {"csv_data": df.to_csv(), "csv_path": csv_path.replace("\\\\", "\\")}
+        return response
 
 if __name__ == "__main__":
     import uvicorn
